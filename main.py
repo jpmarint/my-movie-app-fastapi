@@ -2,11 +2,24 @@ from fastapi import Body, FastAPI, HTTPException, Path, Query, status
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 from typing import Optional, List
+from jwt_manager import create_token, validate_token
 
 app = FastAPI()
 app.title =  "My FastAPI app"
 app.version = "0.1.0"
 
+
+class User(BaseModel):
+    email: str
+    password: str
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "email": "admin@gmail.com",
+                "password": "123456"
+            }
+        }
 
 class Movie(BaseModel):
     id: Optional[int] = None
@@ -51,6 +64,16 @@ movies = [
 @app.get('/', tags=['home'])
 def message():
     return HTMLResponse('<h1>Hello World</h1>')
+
+@app.post("/login", tags=["auth"])
+def login(user: User):
+    if (user.email == "admin@gmail.com" and user.password == "123456"):
+        print(user.dict())
+        token: str = create_token(user.dict())
+        return JSONResponse(status_code=200, content=token)
+    else:
+        return JSONResponse(status_code=401, content={"message": "Credenciales inválidas, intente de nuevo"})
+
 
 @app.get('/movies', 
          tags=["movies"], 
