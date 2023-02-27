@@ -1,15 +1,12 @@
-from fastapi import Body, FastAPI, HTTPException, Path
-from fastapi.responses import HTMLResponse
+from fastapi import Body, FastAPI, HTTPException, Path, Query, status
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 
 app = FastAPI()
 app.title =  "My FastAPI app"
 app.version = "0.1.0"
 
-@app.get('/', tags=['home'])
-def message():
-    return HTMLResponse('<h1>Hello World</h1>')
 
 class Movie(BaseModel):
     id: Optional[int] = None
@@ -31,13 +28,12 @@ class Movie(BaseModel):
             }
         }
 
-
 movies = [
         {
             'id': 1,
             'title': 'Avatar',
             'overview': "En un exuberante planeta llamado Pandora viven los Na'vi, seres que ...",
-            'year': '2009',
+            'year': 'status.HTTP_200_OK9',
             'rating': 7.8,
             'category': 'Acción'    
         },
@@ -51,14 +47,23 @@ movies = [
         } 
     ]
 
-@app.get('/movies', tags=["movies"])
-def get_movies():
-    return movies
+
+@app.get('/', tags=['home'])
+def message():
+    return HTMLResponse('<h1>Hello World</h1>')
+
+@app.get('/movies', 
+         tags=["movies"], 
+         response_model=List[Movie],
+         status_code=status.HTTP_200_OK)
+def get_movies() -> List[Movie]:
+    return JSONResponse(content=movies, status_code=status.HTTP_200_OK)
 
 @app.get(path="/movies/{id}",
          tags=["movies"],
-         summary="Show a movie in the app")
-def get_movie(id: int = Path(ge=1, le=2000)):
+         summary="Show a movie in the app",
+         response_model=Movie)
+def get_movie(id: int = Path(ge=1, le=status.HTTP_200_OK)):
     """Get a movie
     
     - Params:
@@ -75,21 +80,31 @@ def get_movie(id: int = Path(ge=1, le=2000)):
     movie = [movie for movie in movies if movie['id'] == id]
     if not movie:
         raise HTTPException(status_code=404, detail="Movie not found")
-    return movie
+    return JSONResponse(content= movie)
 
 
-@app.get('/movies/', tags=['movies']) 
-def get_movies_by_category(category: str, year: int = None):
-    return [item for item in movies if item['category'] == category]
+@app.get('/movies/', 
+         tags=['movies'],
+         response_model=List[Movie]) 
+def get_movies_by_category(category: str = Query(min_length=5, max_length=15)) -> List[Movie]:
+    data = [item for item in movies if item['category'] == category]
+    return JSONResponse(content = data)
 
-@app.post('/movies', tags=['movies'])
-def create_movie(movie: Movie):
+
+@app.post('/movies', 
+          tags=['movies'], 
+          response_model=dict,
+          status_code=status.HTTP_201_CREATED)
+def create_movie(movie: Movie) -> dict:
     movies.append(movie)
-    return movies
+    return JSONResponse(content={"message":"Movie has been added succesfuly"}, status_code=status.HTTP_201_CREATED)
 
 
-@app.put('/movies/{id}', tags=['movies'])
-def update_movie(id: int, movie: Movie):
+@app.put('/movies/{id}', 
+         tags=['movies'], 
+         response_model=dict,
+         status_code=status.HTTP_200_OK)
+def update_movie(id: int, movie: Movie) -> dict:
     for item in movies:
         if item['id'] == id:
             item['title'] = movie.title
@@ -97,15 +112,18 @@ def update_movie(id: int, movie: Movie):
             item['year'] = movie.year
             item['rating'] = movie.rating
             item['category'] = movie.category
-            return movies
+            return JSONResponse(content={"message":"Movie has been updated succesfuly"}, status_code=status.HTTP_200_OK)
         
-    return HTTPException(status_code=404, detail="Movie not found")
+    return JSONResponse(content={"message":"Movie not found"}, status_code=status.HTTP_404_NOT_FOUND)
 
-@app.delete('/movies/{id}', tags=['movies'])
-def delete_movie(id: int):
+@app.delete('/movies/{id}', 
+            tags=['movies'], 
+            response_model=dict,
+            status_code=status.HTTP_200_OK)
+def delete_movie(id: int) -> dict:
     for item in movies:
         if item["id"] == id:
             movies.remove(item)
-            return movies
+            return JSONResponse(content={"message":"Movie deleted succesfuly"}, status_code=status.HTTP_200_OK)
         
-    return HTTPException(status_code=404, detail="Movie not found")
+    return JSONResponse(content={"message":"Movie not found"}, status_code=status.HTTP_404_NOT_FOUND)
