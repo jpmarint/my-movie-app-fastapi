@@ -1,7 +1,6 @@
 # FastAPI
 from fastapi import Body, Depends, FastAPI, HTTPException, Path, Query, Request, status
 from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.security import HTTPBearer
 from fastapi.encoders import jsonable_encoder
 
 # Pydantic for model handling
@@ -11,9 +10,15 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 
 #local libraries management
-from jwt_manager import create_token, validate_token
+## Token management
+from jwt_manager import create_token
+from middlewares.jwt_bearer import JWTBearer
+## Databse connection
 from config.database import Session, engine, Base
+## Models
 from models.movie import Movie as MovieModel
+## Erro handling
+from middlewares.error_handler import ErrorHandler
 
 
 
@@ -21,16 +26,11 @@ app = FastAPI()
 app.title =  "My FastAPI app"
 app.version = "0.1.0"
 
+app.add_middleware(ErrorHandler)
 
 Base.metadata.create_all(bind=engine)
 
 
-class JWTBearer(HTTPBearer):
-    async def __call__(self, request: Request):
-        auth = await super().__call__(request)
-        data = validate_token(auth.credentials)
-        if data['email'] != "admin@gmail.com":
-            raise HTTPException(status_code=403, detail="Credenciales inválidas, intente de nuevo")
 
 class User(BaseModel):
     email: str
