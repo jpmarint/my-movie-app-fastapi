@@ -18,6 +18,8 @@ from config.database import Session
 ## Models
 from models.movie import Movie as MovieModel
 
+#Services
+from services.movie import MovieService
 
 
 movie_router =  APIRouter()
@@ -61,7 +63,7 @@ def get_movies() -> List[Movie]:
         - List[Movie]: A list with all the movies
     """
     db = Session()
-    results = db.query(MovieModel).all()
+    results = MovieService(db).get_movies()
     return JSONResponse(content=jsonable_encoder(results), status_code=status.HTTP_200_OK)
 
 
@@ -84,7 +86,7 @@ def get_movie(id: int = Path(ge=1, le=5000)):
         - category: str
     """
     db = Session()
-    movie = db.query(MovieModel).filter(MovieModel.id == id).first()
+    movie = MovieService(db).get_movie_by_Id(id)
     if not movie:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Movie not found")
     return JSONResponse(content = jsonable_encoder(movie), status_code=status.HTTP_200_OK)
@@ -107,7 +109,7 @@ def get_movies_by_category(category: str = Query(min_length=5, max_length=15)) -
         - List[Movie]: All the movies with that category
     """
     db = Session()
-    results  =  db.query(MovieModel).filter(MovieModel.category == category).all()
+    results  =  MovieService(db).get_movies_by_category(category)
     if not results:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No movies found")
     return JSONResponse(content = jsonable_encoder(results), status_code=status.HTTP_200_OK)
