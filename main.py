@@ -1,165 +1,38 @@
-from fastapi import Body, Depends, FastAPI, HTTPException, Path, Query, Request, status
+# FastAPI
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.security import HTTPBearer
 
-from pydantic import BaseModel, Field
+# Pydantic for model handling
+from pydantic import BaseModel
 
-from typing import Optional, List
+#local libraries management
+## Token management
+from utils.jwt_manager import create_token
+## Databse connection
+from config.database import Session, engine, Base
+## Erro handling
+from middlewares.error_handler import ErrorHandler
 
-from jwt_manager import create_token, validate_token
-
+#Routers
+from routers.movie import movie_router
+from routers.user import user_router
 
 
 app = FastAPI()
 app.title =  "My FastAPI app"
 app.version = "0.1.0"
 
-class JWTBearer(HTTPBearer):
-    async def __call__(self, request: Request):
-        auth = await super().__call__(request)
-        data = validate_token(auth.credentials)
-        if data['email'] != "admin@gmail.com":
-            raise HTTPException(status_code=403, detail="Credenciales inválidas, intente de nuevo")
-
-class User(BaseModel):
-    email: str
-    password: str
-    
-    class Config:
-        schema_extra = {
-            "example": {
-                "email": "admin@gmail.com",
-                "password": "123456"
-            }
-        }
-
-class Movie(BaseModel):
-    id: Optional[int] = None
-    title: str = Field(max_length=50, min_length=5)
-    overview: str = Field(min_length=15, max_length=50)
-    year: int = Field(le=2023, gt=1900)
-    rating: float = Field(ge=1.0, le=10.0)
-    category: str = Field(min_length=5, max_length=15)
-    
-    class Config:
-        schema_extra = {
-            "example": {
-                "id": 1,
-                "title": "My movie",
-                "overview": "Movie's description ...",
-                "year": 2023,
-                "rating": 9.8,
-                "category": "Acción"
-            }
-        }
-
-movies = [
-        {
-            'id': 1,
-            'title': 'Avatar',
-            'overview': "En un exuberante planeta llamado Pandora viven los Na'vi, seres que ...",
-            'year': 'status.HTTP_200_OK9',
-            'rating': 7.8,
-            'category': 'Acción'    
-        },
-        {
-            'id': 2,
-            'title': 'Interestalar',
-            'overview': "Hanz zimmer",
-            'year': '2010',
-            'rating': 10.0,
-            'category': 'espacial'    
-        } 
-    ]
+app.add_middleware(ErrorHandler)
+app.include_router(user_router)
+app.include_router(movie_router)
 
 
-@app.get('/', tags=['home'])
+Base.metadata.create_all(bind=engine)
+
+
+@app.get('/',
+         tags=['home'])
 def message():
     return HTMLResponse('<h1>Hello World</h1>')
 
-@app.post("/login", tags=["auth"])
-def login(user: User):
-    if (user.email == "admin@gmail.com" and user.password == "123456"):
-        print(user.dict())
-        token: str = create_token(user.dict())
-        return JSONResponse(status_code=200, content=token)
-    else:
-        return JSONResponse(status_code=401, content={"message": "Credenciales inválidas, intente de nuevo"})
 
-
-@app.get('/movies', 
-         tags=["movies"], 
-         response_model=List[Movie],
-         status_code=status.HTTP_200_OK,
-         dependencies=[Depends(JWTBearer())])
-def get_movies() -> List[Movie]:
-    return JSONResponse(content=movies, status_code=status.HTTP_200_OK)
-
-@app.get(path="/movies/{id}",
-         tags=["movies"],
-         summary="Show a movie in the app",
-         response_model=Movie)
-def get_movie(id: int = Path(ge=1, le=status.HTTP_200_OK)):
-    """Get a movie
-    
-    - Params:
-        id: int
-        
-    - Returns a json with de basic movie information
-        id: int
-        title: str
-        overview: str
-        year: int
-        rating: int
-        category: str
-    """
-    movie = [movie for movie in movies if movie['id'] == id]
-    if not movie:
-        raise HTTPException(status_code=404, detail="Movie not found")
-    return JSONResponse(content= movie)
-
-
-@app.get('/movies/', 
-         tags=['movies'],
-         response_model=List[Movie]) 
-def get_movies_by_category(category: str = Query(min_length=5, max_length=15)) -> List[Movie]:
-    data = [item for item in movies if item['category'] == category]
-    return JSONResponse(content = data)
-
-
-@app.post('/movies', 
-          tags=['movies'], 
-          response_model=dict,
-          status_code=status.HTTP_201_CREATED)
-def create_movie(movie: Movie) -> dict:
-    movies.append(movie)
-    return JSONResponse(content={"message":"Movie has been added succesfuly"}, status_code=status.HTTP_201_CREATED)
-
-
-@app.put('/movies/{id}', 
-         tags=['movies'], 
-         response_model=dict,
-         status_code=status.HTTP_200_OK)
-def update_movie(id: int, movie: Movie) -> dict:
-    for item in movies:
-        if item['id'] == id:
-            item['title'] = movie.title
-            item['overview'] = movie.overview
-            item['year'] = movie.year
-            item['rating'] = movie.rating
-            item['category'] = movie.category
-            return JSONResponse(content={"message":"Movie has been updated succesfuly"}, status_code=status.HTTP_200_OK)
-        
-    return JSONResponse(content={"message":"Movie not found"}, status_code=status.HTTP_404_NOT_FOUND)
-
-@app.delete('/movies/{id}', 
-            tags=['movies'], 
-            response_model=dict,
-            status_code=status.HTTP_200_OK)
-def delete_movie(id: int) -> dict:
-    for item in movies:
-        if item["id"] == id:
-            movies.remove(item)
-            return JSONResponse(content={"message":"Movie deleted succesfuly"}, status_code=status.HTTP_200_OK)
-        
-    return JSONResponse(content={"message":"Movie not found"}, status_code=status.HTTP_404_NOT_FOUND)
