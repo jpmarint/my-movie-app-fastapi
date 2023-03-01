@@ -7,23 +7,13 @@ from pydantic import BaseModel
 
 #local libraries management
 ## Token management
-from jwt_manager import create_token
+from utils.jwt_manager import create_token
+#Schemas/models
+from schemas.user import User
 
 
 user_router =  APIRouter()
 
-
-class User(BaseModel):
-    email: str
-    password: str
-    
-    class Config:
-        schema_extra = {
-            "example": {
-                "email": "admin@gmail.com",
-                "password": "123456"
-            }
-        }
 
 @user_router.post("/login",
           tags=["auth"],

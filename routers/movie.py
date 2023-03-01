@@ -3,51 +3,24 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
-# Pydantic for model handling
-from pydantic import BaseModel, Field
-
 # typing for special models
-from typing import Optional, List
+from typing import List
 
 #local libraries management
 ## Token management
-from jwt_manager import create_token
+from utils.jwt_manager import create_token
 from middlewares.jwt_bearer import JWTBearer
 ## Databse connection
 from config.database import Session
 ## Models
 from models.movie import Movie as MovieModel
-
 #Services
 from services.movie import MovieService
+# Schemas / models
+from schemas.movie import Movie
 
 
 movie_router =  APIRouter()
-
-
-
-# Schemas / models
-class Movie(BaseModel):
-    id: Optional[int] = None
-    title: str = Field(max_length=50, min_length=5)
-    overview: str = Field(min_length=15, max_length=50)
-    year: int = Field(le=2023, gt=1900)
-    rating: float = Field(ge=1.0, le=10.0)
-    category: str = Field(min_length=5, max_length=15)
-    
-    class Config:
-        schema_extra = {
-            "example": {
-                "id": 1,
-                "title": "My movie",
-                "overview": "Movie's description ...",
-                "year": 2023,
-                "rating": 9.8,
-                "category": "Acción"
-            }
-        }
-
-
 
 
 @movie_router.get('/movies', 
@@ -129,9 +102,7 @@ def create_movie(movie: Movie) -> dict:
         - dict: Message movie created or not
     """
     db = Session()
-    newMovie = MovieModel(**movie.dict())
-    db.add(newMovie)
-    db.commit()
+    MovieService(db).create_movie(movie)
     return JSONResponse(content={"message":"Movie has been added succesfuly"}, status_code=status.HTTP_201_CREATED)
 
 
@@ -153,16 +124,11 @@ def update_movie(id: int, movie: Movie) -> dict:
         - dict: movie information sent
     """
     db = Session()
-    result = db.query(MovieModel).filter(MovieModel.id == id).first()
+    result = MovieService(db).get_movie_by_Id(id)
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Movie not found")
     
-    result.title = movie.title
-    result.category = movie.category
-    result.overview = movie.overview
-    result.rating = movie.rating
-    result.year = movie.year  
-    db.commit()
+    MovieService(db).update_movie(id, movie)
     return JSONResponse(content = jsonable_encoder(movie), status_code=status.HTTP_200_OK)
 
 
@@ -173,10 +139,9 @@ def update_movie(id: int, movie: Movie) -> dict:
             summary="Delete a movie")
 def delete_movie(id: int) -> dict:        
     db = Session()
-    result = db.query(MovieModel).filter(MovieModel.id == id).first()
+    result = MovieService(db).get_movie_by_Id(id)
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Movie not found")
     
-    db.delete(result)
-    db.commit()
+    MovieService(db).delete_movie(id)
     return JSONResponse(content={"message":"Movie deleted succesfuly"}, status_code=status.HTTP_200_OK)
